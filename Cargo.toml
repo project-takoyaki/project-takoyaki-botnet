@@ -1,0 +1,16 @@
+[package]
+name = "project-takoyaki-botnet"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "project-takoyaki-peer"
+path = "project-takoyaki-peer/source/main.rs"
+
+[[bin]]
+name = "project-takoyaki-scanner"
+path = "project-takoyaki-scanner/source/main.rs"
+
+[dependencies]
+env_logger = "0.11.5"
+log = "0.4.22"
