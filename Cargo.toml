@@ -2,6 +2,7 @@
 name = "project-takoyaki-botnet"
 version = "0.1.0"
 edition = "2021"
+license = "BSD-3"
 
 [[bin]]
 name = "project-takoyaki-peer"
@@ -12,5 +13,7 @@ name = "project-takoyaki-scanner"
 path = "project-takoyaki-scanner/source/main.rs"
 
 [dependencies]
-env_logger = "0.11.5"
+libp2p = { version = "0.54.1", features = ["tokio"] }
 log = "0.4.22"
+pretty_env_logger = "0.5.0"
+tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
