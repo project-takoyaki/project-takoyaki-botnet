@@ -1,19 +1,7 @@
-[package]
-name = "project-takoyaki-botnet"
-version = "0.1.0"
-edition = "2021"
-license = "BSD-3"
-
-[[bin]]
-name = "project-takoyaki-peer"
-path = "project-takoyaki-peer/source/main.rs"
-
-[[bin]]
-name = "project-takoyaki-scanner"
-path = "project-takoyaki-scanner/source/main.rs"
-
-[dependencies]
-libp2p = { version = "0.54.1", features = ["tokio"] }
-log = "0.4.22"
-pretty_env_logger = "0.5.0"
-tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
+[workspace]
+members = [
+  "project-takoyaki-cli",
+  "project-takoyaki-peer",
+  "project-takoyaki-scanner"
+]
+resolver = "2"

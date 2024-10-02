@@ -1,3 +1,11 @@
-.idea
-/target
+# IDE/Editor-specific settings
+.fleet/
+.idea/
+.vscode/
+
+# OS-specific files
+.DS_Store
+
+# Rust-specific files
+target/
 Cargo.lock
