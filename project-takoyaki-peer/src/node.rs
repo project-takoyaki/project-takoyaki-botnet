@@ -66,13 +66,13 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
 
   /* add seed nodes for bootstrapping */
   /* TODO: add a backup list of known peers */
-  for peer in &SEED_NODES {
-    info!("Adding seed node '{peer}' to the routing table.");
+  for address in &SEED_NODES {
+    info!("Adding seed node '{address}' to the routing table.");
 
-    swarm
-      .behaviour_mut()
-      .kademlia
-      .add_address(&peer.split("/").last().unwrap().parse()?, peer.parse()?);
+    swarm.behaviour_mut().kademlia.add_address(
+      &address.split("/").last().unwrap().parse()?,
+      address.parse()?,
+    );
   }
 
   /* subscribe to gossipsub topic */
@@ -95,8 +95,20 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
         info!("Listening for incoming peer connections on address '{address}'.");
       }
 
+      SwarmEvent::Behaviour(BehaviourEvent::Identify(identify::Event::Sent {
+        peer_id, ..
+      })) => {
+        println!("Sent identify info to {peer_id:?}")
+      }
+
+      SwarmEvent::Behaviour(BehaviourEvent::Identify(identify::Event::Received {
+        info, ..
+      })) => {
+        println!("Received {info:?}")
+      }
+
       SwarmEvent::Behaviour(BehaviourEvent::Upnp(upnp::Event::NewExternalAddr(address))) => {
-        info!("Mapped external address '{address}' through UPnP.");
+        info!("Mapped external address '{address}' through UPnP. Switching to server mode.");
 
         swarm
           .behaviour_mut()
@@ -116,7 +128,6 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
         /* TODO: hole punching fallback */
       }
 
-      //e => {println!("{e:?}")}
       _ => {}
     }
   }

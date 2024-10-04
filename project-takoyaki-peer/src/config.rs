@@ -18,7 +18,7 @@ pub const GOSSIPSUB_TOPIC: &str = "project-takoyaki";
 
 /* list of multiadresses used to bootstrap the network */
 pub const SEED_NODES: [&str; 1] = [
-  "/ip4/192.168.1.231/tcp/53442/p2p/12D3KooWNTQziovAbV3UF2fJwAbAmuFbcmam7Cn5RfsAjJxRLtNi"
+  "/ip4/192.168.1.231/tcp/64406/p2p/12D3KooWQzVCYAtTghHPo6VWGQ27aV1tEPPzSpeESzmXTcmnWMnL"
 ];
 
 /* default port for peers to bind to when establishing connections */
