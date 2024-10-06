@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let port = args.listen_port.unwrap_or(DEFAULT_PORT);
 
   info!(
-    "Starting node with peer ID '{}' on port '{port}'.",
+    "Starting node '{}' on port '{port}'.",
     keypair.public().to_peer_id().to_base58(),
   );
 
@@ -59,5 +59,5 @@ struct Args {
   save_keypair: Option<bool>,
 
   #[clap(long)]
-  listen_port: Option<u16>
+  listen_port: Option<u16>,
 }

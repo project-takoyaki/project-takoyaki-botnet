@@ -8,17 +8,18 @@ pub const SWARM_PRESHARED_KEY: [u8; 32] = [
 pub const KEYPAIR_OVERRIDE_FILENAME: &str = "project-takoyaki-key.override";
 
 /* the unique protocol identifier for node identity */
-pub const IDENTIFY_PROTOCOL_NAME: &str = "/project-takoyaki/id/1.0.0";
+pub const IDENTIFY_PROTOCOL_VERSION: &str = "/project-takoyaki/id/1.0.0";
 
 /* the unique protocol identifier for Kademlia */
-pub const KADEMLIA_PROTOCOL_NAME: &str = "/project-takoyaki/kad/1.0.0";
+pub const KADEMLIA_PROTOCOL_VERSION: &str = "/project-takoyaki/kad/1.0.0";
 
 /* the gossipsub topic to subscribe to */
 pub const GOSSIPSUB_TOPIC: &str = "project-takoyaki";
 
 /* list of multiadresses used to bootstrap the network */
-pub const SEED_NODES: [&str; 1] = [
-  "/ip4/192.168.1.231/tcp/64406/p2p/12D3KooWQzVCYAtTghHPo6VWGQ27aV1tEPPzSpeESzmXTcmnWMnL"
+pub const SEED_NODES: [&str; 2] = [
+  "/ip4/192.168.1.231/tcp/64406/p2p/12D3KooWQzVCYAtTghHPo6VWGQ27aV1tEPPzSpeESzmXTcmnWMnL",
+  "/ip4/192.168.1.231/tcp/64406/p2p/12D3KooWQzVCYAtTghHPo6VWGQ27aV1tEPPzSpeESzmXTcmnWMnL",
 ];
 
 /* default port for peers to bind to when establishing connections */

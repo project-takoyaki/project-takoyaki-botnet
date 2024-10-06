@@ -1,5 +1,6 @@
 use crate::config::{
-  GOSSIPSUB_TOPIC, IDENTIFY_PROTOCOL_NAME, KADEMLIA_PROTOCOL_NAME, SEED_NODES, SWARM_PRESHARED_KEY,
+  GOSSIPSUB_TOPIC, IDENTIFY_PROTOCOL_VERSION, KADEMLIA_PROTOCOL_VERSION, SEED_NODES,
+  SWARM_PRESHARED_KEY,
 };
 
 use futures::StreamExt;
@@ -11,7 +12,11 @@ use libp2p::{
   tcp, upnp, yamux, StreamProtocol, Transport,
 };
 use log::{info, warn};
-use std::{error::Error, process::exit, time::Duration};
+use std::{error::Error, time::Duration};
+use tokio::{
+  io::{self, AsyncBufReadExt},
+  select,
+};
 
 pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn Error>> {
   /* build the swarm */
@@ -39,7 +44,7 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
         .build()?;
 
       /* Kademlia */
-      let mut kad_config = kad::Config::new(StreamProtocol::new(KADEMLIA_PROTOCOL_NAME));
+      let mut kad_config = kad::Config::new(StreamProtocol::new(KADEMLIA_PROTOCOL_VERSION));
       let memory_store = kad::store::MemoryStore::new(keypair.public().to_peer_id());
 
       kad_config.set_query_timeout(Duration::from_secs(300));
@@ -50,7 +55,7 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
           gossipsub_config,
         )?,
         identify: identify::Behaviour::new(identify::Config::new(
-          IDENTIFY_PROTOCOL_NAME.into(),
+          IDENTIFY_PROTOCOL_VERSION.into(),
           keypair.public(),
         )),
         kademlia: kad::Behaviour::with_config(
@@ -61,7 +66,9 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
         upnp: upnp::tokio::Behaviour::default(),
       })
     })?
-    .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+    .with_swarm_config(|swarm_config| {
+      swarm_config.with_idle_connection_timeout(Duration::from_secs(60))
+    })
     .build();
 
   /* add seed nodes for bootstrapping */
@@ -88,47 +95,75 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
   /* attempt to listen on an adress */
   swarm.listen_on(format!("/ip4/0.0.0.0/tcp/{port}").parse()?)?;
 
+  let mut stdin = io::BufReader::new(io::stdin()).lines();
+
   /* TODO: seperate this event loop */
   loop {
-    match swarm.select_next_some().await {
-      SwarmEvent::NewListenAddr { address, .. } => {
-        info!("Listening for incoming peer connections on address '{address}'.");
+    select! {
+      Ok(Some(line)) = stdin.next_line() => {
+        if let Err(_) = swarm
+          .behaviour_mut()
+          .gossipsub
+          .publish(gossipsub_topic.clone(), line.as_bytes()) { }
       }
 
-      SwarmEvent::Behaviour(BehaviourEvent::Identify(identify::Event::Sent {
-        peer_id, ..
-      })) => {
-        println!("Sent identify info to {peer_id:?}")
+      event = swarm.select_next_some() => {
+        handle_event(event, &mut swarm).await;
       }
+    }
+  }
+}
 
-      SwarmEvent::Behaviour(BehaviourEvent::Identify(identify::Event::Received {
-        info, ..
-      })) => {
-        println!("Received {info:?}")
-      }
+async fn handle_event(event: SwarmEvent<BehaviourEvent>, swarm: &mut libp2p::Swarm<Behaviour>) {
+  match event {
+    SwarmEvent::NewListenAddr { address, .. } => {
+      info!("Listening for incoming peer connections on address '{address}'.");
+    }
 
-      SwarmEvent::Behaviour(BehaviourEvent::Upnp(upnp::Event::NewExternalAddr(address))) => {
-        info!("Mapped external address '{address}' through UPnP. Switching to server mode.");
+    SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
+      propagation_source,
+      message_id,
+      message,
+    })) => {
+      println!(
+        "Got message: '{}' with id: {message_id} from peer: {propagation_source}",
+        String::from_utf8_lossy(&message.data),
+      );
+    }
 
+    SwarmEvent::Behaviour(BehaviourEvent::Identify(identify::Event::Received { info, .. })) => {
+      for address in info.listen_addrs {
         swarm
           .behaviour_mut()
           .kademlia
-          .set_mode(Some(kad::Mode::Server));
+          .add_address(&info.public_key.to_peer_id(), address);
       }
 
-      SwarmEvent::Behaviour(BehaviourEvent::Upnp(upnp::Event::GatewayNotFound)) => {
-        warn!("UPnP-capable gateway not found. Attempting libp2p hole punching.");
-        exit(1);
-        /* TODO: hole punching fallback */
-      }
+      swarm
+        .behaviour_mut()
+        .gossipsub
+        .add_explicit_peer(&info.public_key.to_peer_id());
+    }
 
-      SwarmEvent::Behaviour(BehaviourEvent::Upnp(upnp::Event::NonRoutableGateway)) => {
-        warn!("Non-routable gateway detected. Attempting libp2p hole punching.");
-        exit(1);
-        /* TODO: hole punching fallback */
-      }
+    SwarmEvent::Behaviour(BehaviourEvent::Upnp(upnp::Event::NewExternalAddr(address))) => {
+      info!("Mapped external address '{address}' through UPnP.");
 
-      _ => {}
+      swarm
+        .behaviour_mut()
+        .kademlia
+        .set_mode(Some(kad::Mode::Server));
+    }
+
+    SwarmEvent::Behaviour(BehaviourEvent::Upnp(upnp::Event::GatewayNotFound)) => {
+      warn!("UPnP-capable gateway not found.");
+    }
+
+    SwarmEvent::Behaviour(BehaviourEvent::Upnp(upnp::Event::NonRoutableGateway)) => {
+      warn!("Non-routable gateway detected.");
+    }
+
+    e => {
+      println!("{e:?}");
     }
   }
 }

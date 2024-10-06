@@ -2,6 +2,6 @@
 members = [
   "project-takoyaki-cli",
   "project-takoyaki-peer",
-  "project-takoyaki-scanner"
+  "project-takoyaki-scanner",
 ]
 resolver = "2"
