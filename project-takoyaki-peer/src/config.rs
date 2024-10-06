@@ -16,11 +16,11 @@ pub const KADEMLIA_PROTOCOL_VERSION: &str = "/project-takoyaki/kad/1.0.0";
 /* the gossipsub topic to subscribe to */
 pub const GOSSIPSUB_TOPIC: &str = "project-takoyaki";
 
+/* default port for peers to bind to when establishing connections */
+pub const DEFAULT_LISTEN_PORT: u16 = 0;
+
 /* list of multiadresses used to bootstrap the network */
 pub const SEED_NODES: [&str; 2] = [
   "/ip4/192.168.1.231/tcp/64406/p2p/12D3KooWQzVCYAtTghHPo6VWGQ27aV1tEPPzSpeESzmXTcmnWMnL",
   "/ip4/192.168.1.231/tcp/64406/p2p/12D3KooWQzVCYAtTghHPo6VWGQ27aV1tEPPzSpeESzmXTcmnWMnL",
 ];
-
-/* default port for peers to bind to when establishing connections */
-pub const DEFAULT_PORT: u16 = 0;

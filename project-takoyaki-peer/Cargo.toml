@@ -7,7 +7,7 @@ license = "BSD-3"
 [dependencies]
 clap = { version = "4.5.18", features = ["derive"] }
 futures = "0.3.30"
-libp2p = { version = "0.54.1", features = ["dns", "gossipsub", "identify", "kad", "macros", "noise", "pnet", "tcp", "tokio", "upnp", "yamux"] }
+libp2p = { version = "0.54.1", features = ["autonat", "dns", "gossipsub", "identify", "kad", "macros", "noise", "pnet", "tcp", "tokio", "upnp", "yamux"] }
 log = "0.4.22"
 pretty_env_logger = "0.5.0"
 rand = "0.8.5"

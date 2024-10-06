@@ -1,7 +1,7 @@
 mod config;
 mod node;
 
-use crate::config::{DEFAULT_PORT, KEYPAIR_OVERRIDE_FILENAME};
+use crate::config::{DEFAULT_LISTEN_PORT, KEYPAIR_OVERRIDE_FILENAME};
 
 use clap::{ArgAction, Parser};
 use libp2p::identity;
@@ -42,14 +42,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("Keypair saved to '{KEYPAIR_OVERRIDE_FILENAME}'.");
   }
 
-  let port = args.listen_port.unwrap_or(DEFAULT_PORT);
+  let listen_port = args.listen_port.unwrap_or(DEFAULT_LISTEN_PORT);
 
   info!(
-    "Starting node '{}' on port '{port}'.",
+    "Starting node '{}' on port '{listen_port}'.",
     keypair.public().to_peer_id().to_base58(),
   );
 
-  node::init(keypair, port).await
+  node::init(keypair, listen_port).await
 }
 
 #[derive(Parser)]

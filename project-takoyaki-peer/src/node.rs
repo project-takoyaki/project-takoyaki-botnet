@@ -5,20 +5,22 @@ use crate::config::{
 
 use futures::StreamExt;
 use libp2p::{
+  autonat,
   core::upgrade::Version,
   gossipsub, identify, identity, kad, noise,
   pnet::{PnetConfig, PreSharedKey},
   swarm::{NetworkBehaviour, SwarmEvent},
   tcp, upnp, yamux, StreamProtocol, Transport,
 };
-use log::{info, warn};
+use log::{error, info, warn};
+use rand::rngs::OsRng;
 use std::{error::Error, time::Duration};
 use tokio::{
   io::{self, AsyncBufReadExt},
   select,
 };
 
-pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn Error>> {
+pub async fn init(keypair: identity::Keypair, listen_port: u16) -> Result<(), Box<dyn Error>> {
   /* build the swarm */
   let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair.clone())
     .with_tokio()
@@ -50,6 +52,11 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
       kad_config.set_query_timeout(Duration::from_secs(300));
 
       Ok(Behaviour {
+        autonat_client: autonat::v2::client::Behaviour::new(
+          OsRng,
+          autonat::v2::client::Config::default().with_probe_interval(Duration::from_secs(2)),
+        ),
+        autonat_server: autonat::v2::server::Behaviour::new(OsRng),
         gossipsub: gossipsub::Behaviour::new(
           gossipsub::MessageAuthenticity::Signed(keypair.clone()),
           gossipsub_config,
@@ -71,8 +78,8 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
     })
     .build();
 
-  /* add seed nodes for bootstrapping */
   /* TODO: add a backup list of known peers */
+  /* add seed nodes for bootstrapping */
   for address in &SEED_NODES {
     info!("Adding seed node '{address}' to the routing table.");
 
@@ -93,18 +100,20 @@ pub async fn init(keypair: identity::Keypair, port: u16) -> Result<(), Box<dyn E
     .subscribe(&gossipsub_topic)?;
 
   /* attempt to listen on an adress */
-  swarm.listen_on(format!("/ip4/0.0.0.0/tcp/{port}").parse()?)?;
+  swarm.listen_on(format!("/ip4/0.0.0.0/tcp/{listen_port}").parse()?)?;
 
   let mut stdin = io::BufReader::new(io::stdin()).lines();
 
-  /* TODO: seperate this event loop */
   loop {
     select! {
       Ok(Some(line)) = stdin.next_line() => {
-        if let Err(_) = swarm
+        if let Err(error) = swarm
           .behaviour_mut()
           .gossipsub
-          .publish(gossipsub_topic.clone(), line.as_bytes()) { }
+          .publish(gossipsub_topic.clone(), line.as_bytes())
+        {
+          error!("Published failed with error '{error:?}'")
+        }
       }
 
       event = swarm.select_next_some() => {
@@ -147,6 +156,10 @@ async fn handle_event(event: SwarmEvent<BehaviourEvent>, swarm: &mut libp2p::Swa
 
     SwarmEvent::Behaviour(BehaviourEvent::Upnp(upnp::Event::NewExternalAddr(address))) => {
       info!("Mapped external address '{address}' through UPnP.");
+    }
+
+    SwarmEvent::ExternalAddrConfirmed { address } => {
+      info!("External address '{address}' confirmed.");
 
       swarm
         .behaviour_mut()
@@ -162,14 +175,14 @@ async fn handle_event(event: SwarmEvent<BehaviourEvent>, swarm: &mut libp2p::Swa
       warn!("Non-routable gateway detected.");
     }
 
-    e => {
-      println!("{e:?}");
-    }
+    _ => {}
   }
 }
 
 #[derive(NetworkBehaviour)]
 struct Behaviour {
+  autonat_client: autonat::v2::client::Behaviour,
+  autonat_server: autonat::v2::server::Behaviour,
   gossipsub: gossipsub::Behaviour,
   identify: identify::Behaviour,
   kademlia: kad::Behaviour<kad::store::MemoryStore>,
