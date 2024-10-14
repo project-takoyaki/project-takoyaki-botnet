@@ -29,14 +29,15 @@ impl Behaviour {
         gossipsub::ConfigBuilder::default().max_transmit_size(262144).build()?,
       )?,
       identify: identify::Behaviour::new(identify::Config::new(
-        Box::leak(format!("/{}/{}", obfstr!(NETWORK_NAME), obfstr!("id/1.0.0")).into_boxed_str()).to_string(),
+        Box::leak(format!("{}{}{}", obfstr!("/"), obfstr!(NETWORK_NAME), obfstr!("/id/1.0.0")).into_boxed_str())
+          .to_string(),
         keypair.public(),
       )),
       kademlia: kad::Behaviour::with_config(
         keypair.public().to_peer_id(),
         kad::store::MemoryStore::new(keypair.public().to_peer_id()),
         kad::Config::new(StreamProtocol::new(Box::leak(
-          format!("/{}/{}", obfstr!(NETWORK_NAME), obfstr!("kad/1.0.0")).into_boxed_str(),
+          format!("{}{}{}", obfstr!("/"), obfstr!(NETWORK_NAME), obfstr!("/kad/1.0.0")).into_boxed_str(),
         ))),
       ),
       upnp: upnp::tokio::Behaviour::default(),

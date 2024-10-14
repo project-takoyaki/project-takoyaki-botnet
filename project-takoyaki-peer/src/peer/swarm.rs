@@ -7,6 +7,7 @@ use libp2p::{
   pnet::{PnetConfig, PreSharedKey},
   tcp, yamux, Swarm, Transport,
 };
+use obfstr::obfbytes;
 
 use crate::config::SWARM_PRESHARED_KEY;
 
@@ -16,7 +17,7 @@ pub async fn build_swarm(keypair: Keypair) -> Result<Swarm<Behaviour>, Box<dyn E
   let swarm = libp2p::SwarmBuilder::with_existing_identity(keypair.clone())
     .with_tokio()
     .with_other_transport(|keypair| {
-      let swarm_key = PreSharedKey::new(SWARM_PRESHARED_KEY);
+      let swarm_key = PreSharedKey::new(*obfbytes!(&SWARM_PRESHARED_KEY));
 
       let noise_config = noise::Config::new(keypair).unwrap();
       let yamux_config = yamux::Config::default();

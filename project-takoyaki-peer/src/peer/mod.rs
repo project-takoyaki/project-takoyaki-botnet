@@ -57,6 +57,7 @@ impl Peer {
 
     loop {
       let event = self.swarm.select_next_some().await;
+
       handle_event(&mut self.swarm, event).await;
     }
   }
