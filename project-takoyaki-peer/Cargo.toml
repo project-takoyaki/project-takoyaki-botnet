@@ -6,6 +6,7 @@ license = "BSD-3"
 
 [dependencies]
 aes-gcm = "0.10.3"
+clap = { version = "4.5.20", features = ["derive"] }
 futures = "0.3.30"
 libp2p = { version = "0.54.1", features = ["autonat", "dns", "gossipsub", "identify", "kad", "macros", "noise", "pnet", "tcp", "tokio", "upnp", "yamux"] }
 log = "0.4.22"

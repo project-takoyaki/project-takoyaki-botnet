@@ -34,18 +34,14 @@ impl Peer {
     )?;
 
     for address in &self.known_peers {
-      if let Some(peer_id) = address.iter().find_map(|protocol| {
-        if let Protocol::P2p(peer_id) = protocol {
-          PeerId::from_multihash(peer_id.as_ref().clone()).ok()
-        } else {
-          None
+      if let Some(Protocol::P2p(peer_id)) = address.iter().last() {
+        if let Ok(peer_id) = PeerId::from_multihash(peer_id.as_ref().clone()) {
+          self
+            .swarm
+            .behaviour_mut()
+            .kademlia
+            .add_address(&peer_id, address.clone());
         }
-      }) {
-        self
-          .swarm
-          .behaviour_mut()
-          .kademlia
-          .add_address(&peer_id, address.clone());
       }
     }
 
