@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "project-takoyaki-keygen",
   "project-takoyaki-peer",
 ]
 resolver = "2"

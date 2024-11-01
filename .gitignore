@@ -1,4 +1,4 @@
-# IDE/Editor-specific settings
+# Editor-specific settings
 .fleet/
 .idea/
 .vscode/

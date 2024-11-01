@@ -6,14 +6,14 @@ license = "BSD-3"
 
 [dependencies]
 aes-gcm = "0.10.3"
-clap = { version = "4.5.20", features = ["derive"] }
+anyhow = "1.0.91"
+bincode = "=2.0.0-rc.3"
+crystals-dilithium = "1.0.0"
 futures = "0.3.30"
 libp2p = { version = "0.54.1", features = ["autonat", "dns", "gossipsub", "identify", "kad", "macros", "noise", "pnet", "tcp", "tokio", "upnp", "yamux"] }
 log = "0.4.22"
+mlua = { version = "0.9.9", features = ["async", "lua54", "serialize", "vendored"] }
 obfstr = "0.4.4"
 pretty_env_logger = "0.5.0"
 rand = "0.8.5"
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.128"
-tokio = { version = "1.40.0", features = ["fs", "macros", "rt-multi-thread"] }
-toml = "0.8.19"
+tokio = { version = "1.40.0", features = ["fs", "io-std", "macros", "rt-multi-thread"] }
