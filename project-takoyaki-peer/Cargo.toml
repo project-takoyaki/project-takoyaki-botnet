@@ -2,7 +2,7 @@
 name = "project-takoyaki-peer"
 version = "0.1.0"
 edition = "2021"
-license = "BSD-3"
+license = "MIT"
 
 [dependencies]
 aes-gcm = "0.10.3"
