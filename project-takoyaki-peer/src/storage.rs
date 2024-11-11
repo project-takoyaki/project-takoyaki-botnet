@@ -122,22 +122,22 @@ impl Storage {
     Ok(executable_path.join(format!("{}{}", obfstr!(NETWORK_NAME), obfstr!(".bin"))))
   }
 
-  fn get_storage_cipher() -> Aes256Gcm {
+  fn get_cipher() -> Aes256Gcm {
     Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(obfbytes!(&STORAGE_ENCRYPTION_KEY)))
   }
 
   fn decrypt(slice: &[u8]) -> Result<Vec<u8>> {
+    let cipher = Self::get_cipher();
     let nonce = Nonce::from_slice(&slice[..12]);
     let ciphertext = &slice[12..];
-    let cipher = Self::get_storage_cipher();
     let decrypted_data = cipher.decrypt(nonce, ciphertext).map_err(|_| anyhow!("{}", obfstr!("Failed to decrypt slice")))?;
 
     Ok(decrypted_data)
   }
 
   fn encrypt(slice: &[u8]) -> Result<Vec<u8>> {
+    let cipher = Self::get_cipher();
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-    let cipher = Self::get_storage_cipher();
     let ciphertext = cipher.encrypt(&nonce, slice).map_err(|_| anyhow!("{}", obfstr!("Failed to encrypt slice")))?;
     let mut result = nonce.to_vec();
     result.extend_from_slice(&ciphertext);
