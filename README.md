@@ -23,7 +23,7 @@ To confirm external reachability, each peer uses the libp2p AutoNAT v2 protocol 
 
 ### Persistence and Data Management
 
-After peer-to-peer identification, each peer updates its internal persistent storage, enabling routing continuity across reboots. Each peer saves its keypair and assigned address to encrypted storage using an obfuscated AES-256 key, saving it to disk if possible.
+After peer-to-peer identification, each peer updates its internal persistent storage, enabling routing continuity across reboots. Each peer saves its keypair and assigned address to a file encrypted using AES-256-GCM.
 
 ### Peer Communication
 
@@ -37,11 +37,11 @@ A command-line tool for generating and managing cryptographic keys and configura
 
 #### Generated Assets
 
-- dilithium-private-key
-- dilithium-public-key
-- network-name
-- storage-encryption-key
-- swarm-encryption-key
+- `dilithium-private-key`
+- `dilithium-public-key`
+- `network-name`
+- `storage-encryption-key`
+- `swarm-encryption-key`
 
 ### `project-takoyaki-peer`
 
@@ -63,7 +63,7 @@ Clone the `project-takoyaki-botnet` repository:
 git clone https://github.com/project-takoyaki/project-takoyaki-botnet.git
 cd project-takoyaki-botnet
 ```
-> Ensure you have [Rust](https://www.rust-lang.org/) installed on your machine. If not, you can install it from the offical website.
+> Ensure you have [Rust](https://www.rust-lang.org/) installed.
 
 Generate the required keys:
 
@@ -79,7 +79,7 @@ Start a node:
 cargo run --bin project-takoyaki-peer --release
 ```
 
-> For connecting to an existing node, set the `BOOTSTRAP_ADDRESS` environment variable to a sever node's multiaddress before starting.
+> To connect to an existing network, set the `BOOTSTRAP_ADDRESS` environment variable to a sever node's multiaddress before starting `project-takoyaki-peer`.
 
 ## License
 
