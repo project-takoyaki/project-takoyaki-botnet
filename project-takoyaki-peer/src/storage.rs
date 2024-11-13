@@ -57,7 +57,7 @@ impl Storage {
     let encrypted_data = match fs::read(storage_path.as_path()).await {
       Ok(data) => data,
       Err(_) => {
-        warn!("Failed to read storage from disk at {storage_path:?}.");
+        warn!("Failed to read storage from disk at {}.", storage_path.display());
         return Self::new().await;
       }
     };
@@ -65,18 +65,18 @@ impl Storage {
     let decrypted_data = match Self::decrypt(&encrypted_data) {
       Ok(data) => data,
       Err(_) => {
-        error!("Failed to decrypt storage from disk at {storage_path:?}.");
+        error!("Failed to decrypt storage from disk at {}.", storage_path.display());
         return Self::new().await;
       }
     };
 
     match bincode::decode_from_slice(&decrypted_data, bincode::config::standard()) {
       Ok((storage, _)) => {
-        info!("Storage loaded from disk at {storage_path:?}.");
+        info!("Storage loaded from disk {}.", storage_path.display());
         return Ok(storage);
       }
       Err(_) => {
-        error!("Failed to decode decrypted storage from disk at {storage_path:?}.");
+        error!("Failed to decode decrypted storage from disk at {}.", storage_path.display());
         return Self::new().await;
       }
     }
@@ -88,8 +88,8 @@ impl Storage {
     let encrypted_data = Self::encrypt(&encoded_data)?;
 
     match fs::write(storage_path.as_path(), encrypted_data).await {
-      Ok(_) => info!("Storage saved to disk at {storage_path:?}."),
-      Err(_) => error!("Failed to save storage to disk at {storage_path:?}."),
+      Ok(_) => info!("Storage saved to disk at {}.", storage_path.display()),
+      Err(_) => error!("Failed to save storage to disk at {}.", storage_path.display()),
     }
 
     Ok(())
@@ -116,10 +116,10 @@ impl Storage {
   }
 
   fn get_storage_path() -> Result<PathBuf> {
-    let mut executable_path = std::env::current_exe()?;
-    executable_path.pop();
+    let executable_path = std::env::current_exe()?;
+    let executable_directory = executable_path.parent().ok_or_else(|| anyhow!("Failed to resolve executable directory"))?;
 
-    Ok(executable_path.join(format!("{}{}", obfstr!(NETWORK_NAME), obfstr!(".bin"))))
+    Ok(executable_directory.join(format!("{}{}", obfstr!(NETWORK_NAME), obfstr!(".bin"))))
   }
 
   fn get_cipher() -> Aes256Gcm {
@@ -139,9 +139,10 @@ impl Storage {
     let cipher = Self::get_cipher();
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let ciphertext = cipher.encrypt(&nonce, slice).map_err(|_| anyhow!("{}", obfstr!("Failed to encrypt slice")))?;
-    let mut result = nonce.to_vec();
-    result.extend_from_slice(&ciphertext);
 
-    Ok(result)
+    let mut encrypted_data = nonce.to_vec();
+    encrypted_data.extend_from_slice(&ciphertext);
+
+    Ok(encrypted_data)
   }
 }

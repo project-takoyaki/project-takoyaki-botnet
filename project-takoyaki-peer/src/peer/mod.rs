@@ -30,7 +30,7 @@ impl Peer {
   pub fn new(storage: Storage) -> Result<Self> {
     let keypair = storage.keypair.clone();
     let swarm = build_swarm(&keypair)?;
-    info!("Built new swarm on {:?}.", storage.keypair.public().to_peer_id());
+    info!("Built swarm using {:?}.", storage.keypair.public().to_peer_id());
 
     Ok(Self { storage, swarm })
   }

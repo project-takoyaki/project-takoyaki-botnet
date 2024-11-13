@@ -55,8 +55,8 @@ impl CLI {
       }
 
       match swarm.behaviour_mut().gossipsub.publish(self.gossipsub_topic.clone(), payload.to_vec()?) {
-        Ok(_) => info!("Published {buffer:?} to network {NETWORK_NAME:?}."),
-        Err(error) => error!("Failed to publish {buffer:?} to network {NETWORK_NAME:?}: {error:?}"),
+        Ok(_) => info!("Published {buffer:?} to {NETWORK_NAME:?}."),
+        Err(error) => error!("Failed to publish {buffer:?} to {NETWORK_NAME:?}: {error:?}"),
       }
     }
 

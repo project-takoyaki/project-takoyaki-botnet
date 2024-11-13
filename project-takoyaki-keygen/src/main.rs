@@ -1,49 +1,83 @@
-use std::{fs::File, io::Write};
+use std::{
+  fs,
+  path::{Path, PathBuf},
+};
 
-use aes_gcm::aead::rand_core::{OsRng, RngCore};
+use aes_gcm::aead::{rand_core::RngCore, OsRng};
 use anyhow::Result;
+use cliclack::{clear_screen, confirm, input, intro, log, outro};
+use console::style;
 use crystals_dilithium::dilithium3;
-use log::info;
 
 fn main() -> Result<()> {
-  pretty_env_logger::formatted_builder().filter_level(log::LevelFilter::Info).init();
+  clear_screen()?;
 
-  let mut swarm_preshared_key = [0u8; 32];
-  OsRng.fill_bytes(&mut swarm_preshared_key);
+  intro(style("project-takoyaki-keygen").cyan())?;
 
-  let mut storage_encryption_key = [0u8; 32];
-  OsRng.fill_bytes(&mut storage_encryption_key);
+  let output_directory: String = input("Where would you like to put the generated files?")
+    .default_input("./")
+    .validate_interactively(|input: &String| {
+      let path = Path::new(input);
+      if !path.exists() || !path.is_dir() {
+        Err("Invalid directory")
+      } else {
+        Ok(())
+      }
+    })
+    .interact()?;
+  let network_name: String = input(format!("What {} would you like configured?", style("network-name").blue())).default_input("project-takoyaki").interact()?;
+  let generate_dilithium_keypair = confirm(format!("Would you like to generate {} and {}?", style("dilithium-private-key").blue(), style("dilithium-public-key").blue()))
+    .initial_value(true)
+    .interact()?;
+  let generate_storage_encryption_key = confirm(format!("Would you like to generate {}?", style("storage-encryption-key").blue())).initial_value(true).interact()?;
+  let generate_swarm_preshared_key = confirm(format!("Would you like to generate {}?", style("swarm-preshared-key").blue())).initial_value(true).interact()?;
 
-  let dilithium_keypair = dilithium3::Keypair::generate(None);
-  let dilithium_public_key = dilithium_keypair.public.to_bytes();
-  let dilithium_private_key = dilithium_keypair.secret.to_bytes();
+  log::info(format!("Saving network configuration files for {}.", style(&network_name).green()))?;
 
-  let config = format!(
-    "{}\n{}\n{}\npub const NETWORK_NAME: &str = \"project-takoyaki\";\n",
-    format_byte_array("SWARM_PRESHARED_KEY", &swarm_preshared_key),
-    format_byte_array("STORAGE_ENCRYPTION_KEY", &storage_encryption_key),
-    format_byte_array("DILITHIUM_PUBLIC_KEY", &dilithium_public_key)
-  );
+  let output_path = PathBuf::from(output_directory).canonicalize()?;
 
-  let mut executable_path = std::env::current_exe()?;
-  executable_path.pop();
+  let spinner = cliclack::spinner();
+  spinner.start(format!("Saving {}.", style("network-name").blue()));
+  fs::write(output_path.join("network-name"), network_name.as_bytes())?;
+  spinner.stop(format!("Saved {}.", style("network-name").blue()));
 
-  let config_path = executable_path.join("config.rs");
-  let mut config_file = File::create(config_path.clone())?;
-  config_file.write_all(config.as_bytes())?;
+  if generate_dilithium_keypair {
+    let spinner = cliclack::spinner();
+    spinner.start(format!("Generating {} and {}.", style("dilithium-public-key").blue(), style("dilithium-private-key").blue()));
 
-  info!("Saved config to disk at {config_path:?}.");
+    let dilithium_keypair = dilithium3::Keypair::generate(None);
+    fs::write(output_path.join("dilithium-public-key"), dilithium_keypair.public.to_bytes())?;
+    fs::write(output_path.join("dilithium-private-key"), dilithium_keypair.secret.to_bytes())?;
 
-  let private_key_path = executable_path.join("project-takoyaki.key");
-  let mut key_file = File::create(private_key_path.clone())?;
-  key_file.write_all(&dilithium_private_key)?;
+    spinner.stop(format!("Saved {} and {}.", style("dilithium-public-key").blue(), style("dilithium-private-key").blue()));
+  }
 
-  info!("Saved Dilithium private key to disk at {private_key_path:?}.");
+  if generate_storage_encryption_key {
+    let spinner = cliclack::spinner();
+    spinner.start(format!("Generating {}.", style("storage-encryption-key").blue()));
+
+    let mut storage_encryption_key = [0u8; 32];
+    OsRng.fill_bytes(&mut storage_encryption_key);
+    fs::write(output_path.join("storage-encryption-key"), &storage_encryption_key)?;
+
+    spinner.stop(format!("Saved {}.", style("storage-encryption-key").blue()));
+  }
+
+  if generate_swarm_preshared_key {
+    let spinner = cliclack::spinner();
+    spinner.start(format!("Generating {}.", style("swarm-preshared-key").blue()));
+
+    let mut swarm_preshared_key = [0u8; 32];
+    OsRng.fill_bytes(&mut swarm_preshared_key);
+    fs::write(output_path.join("swarm-preshared-key"), &swarm_preshared_key)?;
+
+    spinner.stop(format!("Saved {}.", style("swarm-preshared-key").blue()));
+  }
+
+  let display_path_lossy = output_path.to_string_lossy();
+  let display_path = if display_path_lossy.starts_with(r"\\?\") { &display_path_lossy[r"\\?\".len()..] } else { &display_path_lossy }.to_string();
+
+  outro(format!("Saved network configuration files in {}.", style(display_path).green()))?;
 
   Ok(())
-}
-
-fn format_byte_array(name: &str, source: &[u8]) -> String {
-  let bytes: String = source.iter().map(|byte| format!(" 0x{:02x},", byte)).collect();
-  format!("pub const {}: [u8; {}] = [\n {}\n];\n", name, source.len(), bytes)
 }

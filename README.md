@@ -1,66 +1,86 @@
 # project-takoyaki-botnet
 
-A proof-of-concept peer-to-peer botnet implemented in Rust using the [libp2p](https://libp2p.io) networking stack. This
-project was made for research purposes and showcases how to implement a secure, distributed
-peer-to-peer infrastructure with built-in cryptographic mechanisms and scripting for flexibility.
+A proof-of-concept peer-to-peer botnet implemented in Rust using the [libp2p](https://libp2p.io) networking stack.
 
 ## About
 
-This project was initiated to explore the Kademlia Distributed Hash Table (DHT) and the mathematical principles that
-support it. Additionally, it aims to provide insights into how peer-to-peer (P2P) interactions are managed within
-blockchain networks, such as Ethereum.
+This project uses the [Kademlia distributed hash table](https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf) for scalable peer-to-peer networking. It is inspired by Kademlia's underlying mathematics, which enables distance-based node discovery and routing. Kademlia is a key component in blockchain systems like Ethereum, where it helps manage decentralized data efficiently. This project applies Kademlia in the context of cybersecurity, aiming to improve the resilience and efficiency of decentralized networks.
+
+> **Disclaimer:** This project is for educational and research purposes only. It should not be used for any activities that violate laws or regulations. The authors and contributors disclaim any responsibility for misuse of the project.
 
 ## Protocol
 
 ### Peer Discovery
 
-1. **Bootstrapping**: When a new peer joins the network, it connects to a known peer by setting the `BOOTSTRAP_ADDRESS`
-   environment variable to the peer-to-peer multiaddress of any available peer. This serves as the initial entry into
-   the network.
-2. **Peer Identification**: Upon establishing a connection, peers utilize the libp2p Identify protocol to exchange peer
-   information. This verifies version compatibility and initializes end-to-end encrypted peer-to-peer tunnels.
-3. **External Address Verification**: To confirm a peer's external reachability, each peer uses the libp2p AutoNAT v2
-   protocol to test NAT traversal capabilities. This mutual verification allows peers to confirm external addresses.
-   If an external address is discovered, the peer configures itself to be a server node, enhancing the Kademlia network
-   quality.
+#### 1. Bootstrapping
+When a new peer joins the network, it connects to a known peer specified by the `BOOTSTRAP_ADDRESS` environment variable, which contains the peer-to-peer multiaddress of an available peer. This serves as the initial entry point into the network.
 
-### Achieving Persistence
+#### 2. Peer Identification
+Upon establishing a connection, peers use the libp2p Identify protocol to exchange peer information, verify version compatibility, and initialize end-to-end encrypted peer-to-peer tunnels.
 
-After peer-to-peer identification, peers update their internal persistent storage to allow for routing across reboots.
-Each peer also saves its keypair and assigned address to this storage. The storage is saved to disk if possible and
-is encrypted using an obfuscated AES-256 key.
+#### 3. External Address Verification
+To confirm external reachability, each peer uses the libp2p AutoNAT v2 protocol to test NAT traversal capabilities. This process allows peers to verify each other's external addresses. If an external address is discovered, the peer configures itself as a server node to improve network quality.
 
-### Communication
+### Persistence and Data Management
 
-Peers in the network use the libp2p GossipSub protocol to broadcast and listen for commands
-and [Dilithium](https://pq-crystals.org/dilithium/) for payload signing. A peer can only send commands if it verifies
-the authenticity of a Dilithium private key from a stored file. Only commands signed with the private key will be
-acknowledged by other peers. Having the `project-takoyaki.key` file present allows the peer to send commands by reading
-from the standard input.
+After peer-to-peer identification, each peer updates its internal persistent storage, enabling routing continuity across reboots. Each peer saves its keypair and assigned address to encrypted storage using an obfuscated AES-256 key, saving it to disk if possible.
 
-## Structure
+### Peer Communication
 
-The configuration and keys for the network can be generated using `project-takoyaki-keygen`, which will create the
-AES-256 key used for encrypting the storage file, the network secret key, and the Dilithium keypair. It will generate
-`config.rs` and `project-takoyaki.key`, with the latter containing the Dilithium private key.
+Peers in the network use the libp2p GossipSub protocol to broadcast and listen for commands. For payload signing, they use [Dilithium](https://pq-crystals.org/dilithium/), a post-quantum cryptographic algorithm. A peer can only send commands after verifying the authenticity of a Dilithium private key stored in the `project-takoyaki.key` file. Only commands signed with this key will be accepted by other peers. An authenticated peer sends commands by reading from standard input.
 
-The main peer software is in `project-takoyaki-peer`, containing everything related to peer-to-peer communication and
-the network.
+## Project Components
 
-## Features
+### `project-takoyaki-keygen`
 
-- **Decentralized Peer-to-Peer Discovery**
-- **Secure Persistent Storage**
-- **Adaptive Peer Management**
-- **Post-Quantum Cryptography**
-- **Lua 5.4 Scripting Integration**
+A command-line tool for generating and managing cryptographic keys and configuration files used by `project-takoyaki-peer`.
 
-## Disclaimer
+#### Generated Assets
 
-**This project is for educational and research purposes only**. It should not be used for any activities that are
-illegal or violate laws and regulations. The authors and contributors disclaim any responsibility for misuse of the
-project.
+- dilithium-private-key
+- dilithium-public-key
+- network-name
+- storage-encryption-key
+- swarm-encryption-key
+
+### `project-takoyaki-peer`
+
+The core module for coordinating command-and-control operations over a decentralized peer-to-peer network.
+
+#### Features
+
+- Distance-based peer discovery
+- Secure persistent storage
+- Adaptive peer management
+- Post-quantum cryptography
+- Lua 5.4 scripting integration
+
+## Building
+
+Clone the `project-takoyaki-botnet` repository:
+
+```bash
+git clone https://github.com/project-takoyaki/project-takoyaki-botnet.git
+cd project-takoyaki-botnet
+```
+> Ensure you have [Rust](https://www.rust-lang.org/) installed on your machine. If not, you can install it from the offical website.
+
+Generate the required keys:
+
+```bash
+cargo run --bin project-takoyaki-keygen --release
+```
+
+> This project comes with pre-generated keys, but it is strongly reccomended to generate your own.
+
+Start a node:
+
+```bash
+cargo run --bin project-takoyaki-peer --release
+```
+
+> For connecting to an existing node, set the `BOOTSTRAP_ADDRESS` environment variable to a sever node's multiaddress before starting.
 
 ## License
 
-This project is licensed under the MIT license. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

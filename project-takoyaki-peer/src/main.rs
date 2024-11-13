@@ -33,11 +33,11 @@ async fn main() -> Result<()> {
 
   let bootstrap_address = env::var(obfstr!("BOOTSTRAP_ADDRESS")).ok().and_then(|address| match address.parse::<Multiaddr>() {
     Ok(address) => {
-      info!("Parsed bootstrap address {address:?}.");
+      info!("Parsed bootstrap address {address}.");
       Some(address)
     }
     Err(_) => {
-      warn!("Failed to parse bootstrap address '{address}'.");
+      warn!("Failed to parse bootstrap address {address}.");
       None
     }
   });
@@ -52,23 +52,16 @@ async fn main() -> Result<()> {
 }
 
 async fn load_dilithium_private_key() -> Option<SecretKey> {
-  let mut executable_path = std::env::current_exe().ok()?;
-  executable_path.pop();
+  let executable_path = std::env::current_exe().ok()?;
+  let executable_directory = executable_path.parent()?;
 
-  let dilithium_private_key_path = executable_path.join(format!("{}.key", obfstr!(NETWORK_NAME)));
+  let dilithium_private_key_path = executable_directory.join(format!("{}.key", obfstr!(NETWORK_NAME)));
   let dilithium_private_key_bytes = match fs::read(&dilithium_private_key_path).await {
     Ok(bytes) => bytes,
-    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-      info!("No Dilithium private key file found at {dilithium_private_key_path:?}. Skipping authentication.");
-      return None;
-    }
-    Err(_) => {
-      error!("Failed to read Dilithium private key from path {dilithium_private_key_path:?} due to an unexpected error.");
-      return None;
-    }
+    Err(_) => return None,
   };
 
-  info!("Loaded Dilithium private key from disk at {dilithium_private_key_path:?}.");
+  info!("Loaded Dilithium private key from disk at {}.", dilithium_private_key_path.display());
 
   let key_bytes: [u8; SECRETKEYBYTES] = match dilithium_private_key_bytes.try_into() {
     Ok(bytes) => bytes,
@@ -84,7 +77,7 @@ async fn load_dilithium_private_key() -> Option<SecretKey> {
 
   let payload = Payload::new(&secret_key, &body.to_vec());
   if payload.verify() {
-    info!("Authenticated with Dilithium private key on network {NETWORK_NAME:?}.");
+    info!("Authenticated with Dilithium private key on {NETWORK_NAME:?}.");
     Some(secret_key)
   } else {
     error!("Failed to verify Dilithium private key: public key mismatch or corrupted key data.");
